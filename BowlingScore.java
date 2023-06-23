@@ -1,74 +1,91 @@
+import java.util.Arrays;
 import java.util.Scanner;
 
 public class BowlingScore {
-	
-    private static final int MAX_PINS = 10;
-    private static final int NUM_FRAMES = 10;
-    private int[] rolls = new int[21];
+    public static final int NUM_FRAMES = 10;
+    public static final int MAX_PINS = 10;
+    private final int[] rolls = new int[21];
+    private final int[] frameScores = new int[NUM_FRAMES];
     private int currentRoll = 0;
-    private int[] frameScores = new int[NUM_FRAMES];
+    private int currentFrame = 1;
 
-    /**
-     * ピンを倒すためのメソッドです。
-     *
-     * @param pins 倒したピンの数
-     */
     public void roll(int pins) {
-        if (pins < 0 || pins > MAX_PINS) {
+    	
+    	//1投で倒せるピンの数は1～10本
+        if (pins < 0 || pins > 10) {
             throw new IllegalArgumentException("Invalid number of pins: " + pins);
         }
-        // Add check to ensure the sum of pins in a frame does not exceed 10
-        if(currentRoll % 2 == 1 && !isStrike(currentRoll - 1) && pins + rolls[currentRoll - 1] > MAX_PINS){
-            throw new IllegalArgumentException("The total pins knocked down in a frame cannot exceed " + MAX_PINS);
+        
+        //1～9フレーム目では、2投の合計が10ピン以内であること
+        if (currentFrame < 10 && 
+        	currentRoll % 2 == 1 && 
+        	rolls[currentRoll - 1] + pins > 10) {
+            
+        	throw new IllegalArgumentException("In one frame, the total number of pins cannot exceed 10.");
         }
+
+        //10フレーム目では、3投の合計が20ピン以内であること
+        if (currentFrame == 10 && 
+        	currentRoll % 2 == 1  && 
+        	rolls[currentRoll - 1] + rolls[currentRoll - 2] + pins > 20) {
+            
+        	throw new IllegalArgumentException("In one frame, the total number of pins cannot exceed 10.");
+        }
+       
         rolls[currentRoll++] = pins;
-    }
-
-
-    public int getFrameScore(int frameNumber) {
-        return frameScores[frameNumber];
-    }
-
-    public int getTotalScore() {
-        int total = 0;
-        for (int score : frameScores) {
-            total += score;
+   
+           //1～9フレーム目でストライクだった場合は2投目をスキップする
+        if (pins == 10 &&
+        	currentRoll % 2 == 1 && 
+        	currentFrame < 10) {
+           
+        	currentRoll++;
         }
-        return total;
+               
+        if (currentRoll % 2 == 0) {
+            currentFrame++;
+        }
+        
+        calculateScores();
     }
-    
-    public void calculateScores() {
-        int frameIndex = 0;
 
-        for (int frame = 0; frame < 10; frame++) {
-            if (isStrike(frameIndex)) {
-                if(frameIndex+2 >= currentRoll) {
-                    frameScores[frame] = -1; // Score for this frame not yet available
-                } else {
-                    frameScores[frame] = 10 + strikeBonus(frameIndex);
-                }
-                frameIndex++;
-            } else if (isSpare(frameIndex)) {
-                if(frameIndex+2 >= currentRoll) {
-                    frameScores[frame] = -1; // Score for this frame not yet available
-                } else {
-                    frameScores[frame] = 10 + spareBonus(frameIndex);
-                }
-                frameIndex += 2;
+    void calculateScores() {
+        int rollIndex = 0;
+        for (int frame = 0; frame < NUM_FRAMES; frame++) {
+            if (isStrike(rollIndex)) {
+                frameScores[frame] = MAX_PINS + rolls[rollIndex + 1] + rolls[rollIndex + 2];
+                rollIndex++;
+            } else if (isSpare(rollIndex)) {
+                frameScores[frame] = MAX_PINS + rolls[rollIndex + 2];
+                rollIndex += 2;
             } else {
-                if(frameIndex+1 >= currentRoll) {
-                    frameScores[frame] = -1; // Score for this frame not yet available
-                } else {
-                    frameScores[frame] = sumOfPinsInFrame(frameIndex);
-                }
-                frameIndex += 2;
+                frameScores[frame] = rolls[rollIndex] + rolls[rollIndex + 1];
+                rollIndex += 2;
             }
         }
     }
 
+    private boolean isStrike(int rollIndex) {
+        return rolls[rollIndex] == MAX_PINS;
+    }
+
+    private boolean isSpare(int rollIndex) {
+        return rolls[rollIndex] + rolls[rollIndex + 1] == MAX_PINS;
+    }
+
+    public int getFrameScore(int frame) {
+        return frameScores[frame];
+    }
+
     /**
-     * スコアを表示します。
+     * ゲームが終了しているかどうかを判断するメソッド。
+     * @return ゲームが終了していればtrue、そうでなければfalse
      */
+    public boolean isGameOver() {
+        // 10フレーム終了か、または投球回数が21回以上ならゲーム終了
+        return currentFrame >= 10 || currentRoll >= 21;
+    }
+    
     public void printScores() {
         for (int i = 0; i < NUM_FRAMES; i++) {
             if (frameScores[i] != -1) {
@@ -80,66 +97,39 @@ public class BowlingScore {
         System.out.printf("Total Score: %d\n", getTotalScore());
     }
 
-    private boolean isStrike(int frameIndex) {
-        return rolls[frameIndex] == 10;
+    public int getTotalScore() {
+        return Arrays.stream(frameScores).sum();
     }
 
-    private int sumOfPinsInFrame(int frameIndex) {
-        return rolls[frameIndex] + rolls[frameIndex + 1];
-    }
-
-    private int spareBonus(int frameIndex) {
-        return rolls[frameIndex + 2];
-    }
-
-    private int strikeBonus(int frameIndex) {
-        return rolls[frameIndex + 1] + rolls[frameIndex + 2];
-    }
-
-    private boolean isSpare(int frameIndex) {
-        return rolls[frameIndex] + rolls[frameIndex + 1] == 10;
+    public int getRoll(int rollIndex) {
+        return rolls[rollIndex];
     }
 
     public static void main(String[] args) {
-        BowlingScore game;
+        BowlingScore game = new BowlingScore();
         Scanner scanner = new Scanner(System.in);
-        String playAgain;
-        do {
+        while (true) {
             game = new BowlingScore();
-            int frame = 1;
-            int roll = 1;
-            for (int i = 0; i < 21; i++) {
-                System.out.println("Frame " + frame + ", roll " + roll);
-                int pins;
-                do {
-                    System.out.println("Enter number of pins knocked down (0-10):");
-                    pins = scanner.nextInt();
-                } while (pins < 0 || pins > 10);
-                game.roll(pins);
-                game.calculateScores();
-                game.printScores();
-
-                if (frame < 10 && roll == 1 && pins == 10) {
-                    frame++;
-                } else if (frame < 10 && roll == 2) {
-                    frame++;
-                    roll = 1;
-                } else if (frame == 10) {
-                    roll++;
-                } else {
-                    roll++;
-                }
-
-                // If we've played 10 frames, break out of the loop
-                if (frame > 10 && game.frameScores[9] != -1 || frame == 10 && roll > 3) {
-                    break;
-                }
+            playBowling(game, scanner);
+            System.out.println("Game Over. Play again? (yes/no)");
+            String playAgain = scanner.next();
+            if (!playAgain.equalsIgnoreCase("yes")) {
+                break;
             }
-            System.out.println("Game Over");
-            System.out.println("Would you like to play again? (yes/no)");
-            playAgain = scanner.next();
-        } while (playAgain.equalsIgnoreCase("yes"));
+        }
         scanner.close();
-        System.out.println("Thank you for playing!");
     }
+
+	private static void playBowling(BowlingScore game, Scanner scanner) {
+		for (int i = 0; i < 21; i++) {
+		    try {
+		        System.out.printf("Frame %d, roll %d:\n", (i / 2) + 1, (i % 2) + 1);
+		        game.roll(scanner.nextInt());
+		        game.printScores();
+		    } catch (IllegalArgumentException e) {
+		        System.out.println(e.getMessage());
+		        i--;
+		    }
+		}
+	}
 }
